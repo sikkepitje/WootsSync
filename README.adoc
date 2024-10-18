@@ -1,0 +1,132 @@
+= WootsSync
+
+Versie 20241018
+
+== Abstract
+
+WootsSync synchroniseert programma's in https://app.woots.nl[Woots] met gegevens die worden gelezen uit Magister. Het maakt programma's aan of werkt deze bij, door de docenten, klassen en legroepen te synchroniseren met de informatie in Magister. Magister is een veelgebruikt schooladministratiesysteem voor het voortgezet onderwijs in Nederland. Woots is een digitaal toetsplatformen toetsbibliotheek.
+
+== Vereisten
+
+Dit script vereist:
+
+* Windows PowerShell 5, PowerShell 7 of hoger.
+* https://github.com/sikkepitje/Woots-PowerShell[Woots PowerShell module] 
+* Gegevens uit Magister; deze worden opgehaald door het ImportMagister script uit https://github.com/sikkepitje/TeamSync[TeamSync].
+
+== Installatie
+
+Download de bestanden uit GitHub en plaats ze in een map naar keuze. Maak hierin een map met de naam ``Data``. Zorg ervoor dat aan de bovengenoemde vereisten is voldaan.
+
+== Gebruik
+
+Haal de gegevens op uit Magister met behulp van ``Import-Magister.ps1``. Raadpleeg de documentatie op [TeamSync] voor uitleg over het gebruik. Kopieer de bestanden ``magister_leerling.clixml``, ``magister_docent.clixml`` en ``magister_vak.clixml`` naar de datamap.
+
+Haal een API-token op uit Woots. Dit doe je door in te loggen als beheerder in Woots, klik op je avatar, kies instellingen, kies API-token en klik op "Generate new token". Vul het token en de school_id in een aanroep naar ``Initialize-Woots`` als volgt: ``Initialize-Woots -hostname 'app.woots.nl' -school_id {school_id} -token {token}`` 
+
+Voer ``WootsSync-ReadPhase.ps1`` uit. Controleer vervolgens het resultaat door het bestand ``data\wootssync.csv`` te inspecteren. Wanneer je tevreden bent met het resultaat, voer daarna ``WootsSync-WritePhase.ps1`` uit om de programma's aan te maken in Woots. 
+
+== Documentatie 
+
+=== Import-Magister
+Het script ``Import-Magister.ps1`` haalt leerlingen, docenten en vakken op uit Magister. ``Import-Magister.ps1`` vind je in de https://github.com/sikkepitje/teamsync[TeamSync repository]. Het resultaat zijn de volgende bestanden:
+
+* ``magister_leerlingen.clixml``
+* ``magister_docenten.clixml``
+* ``magister_vak.clixml``
+
+Deze bestanden moeten worden geplaatst in de Datamap en worden ingelezen door WritePhase.
+
+=== WootsSync-ReadPhase
+Het script ``WootsSync-ReadPhase.ps1`` leest deze bestanden in en bouwt een 
+lijst met programma's op. Het genereert een programmanaam voor elke unieke 
+combinatie van leerjaar, studie en vak en koppelt de klassen en docenten 
+hieraan. Het doet dit als volgt. 
+
+1. Het telt alle leerlingen af, en 
+ .. voor elke leerling loopt alle lesgroepen af. Het splitst de naam van de lesgroep. Het deel  vóór de punt wordt gesplitst in leerjaar (1,2,3,4,5 of 6) en studie ('b','h','m' of'v') en het deel na de punt wordt  geinterpreteerd als vakcode. Het zoekt de vakomschrijving op voor elke vakcode. Het bouwt nu een programmanaam op door combineren van  leerjaar, studie en vakomschrijving. Het voegt de lesgroep van de leerling toe aan het programma. 
+ .. indien onderbouw (leerjaar =< 3), loopt alle vakken af. Voor elke combinatie van leerjaar,  studie en vak voegt de klas van de leerling toe aan het respectievelijke programma. Het maakt  het programma aan, indien deze nog  niet bestaat. 
+2. Het telt alle docenten af, 
+ .. telt alle groepvakken af. Voor elk groepvak, bepaalt leerjaar en studie uit de klas en vak uit de vakcode en voegt de docent toe aan het respectievelijke programma, indien  deze bestaat. 
+ .. telt alle klasvakken af
+ .. telt alle docentvakken af. Het bepaalt leerjaar en studie uit de klas, en voegt voor elke combinatie van leerjaar, studie en vak de docent toe aan het respectievelijke programma, indien deze bestaat. 
+
+``WootsSync-ReadPhase.ps1`` maakt hierbij gebruik van een of meer filters in 
+bestanden in de Datamap. Zie onder voor uitleg.
+
+Het resultaat wordt bewaard in de datamap in de volgende bestanden.
+
+* ``WootsSync.clixml``
+* ``WootsSync.csv``
+* ``WootsSync.txt`` bevat een lijst met programmanamen.
+
+Open deze bestanden om het te verwachten resultaat te beoordelen. 
+
+=== WootsSync-WritePhase
+Het script ``WootsSync-WritePhase.ps1`` leest ``WootsSync.clixml`` en loopt alle programma's in deze lijst langs en brengt ze in Woots in overeenstemming hiermee.
+
+Docentcodes worden aangevuld met '@jpthijsse.nl' om een geldig e-mail te genereren. De betreffende docent wordt met dit e-mail in Woots opgezocht.
+
+* Het programma wordt aangemaakt, indien het niet bestaat.
+* De klassen worden aan het programma gekoppeld.
+* de lesgroepen worden het programma gekoppeld.
+* De docenten worden aan het programma gekoppeld, indien ze nog niet gekoppeld 
+zijn.
+
+=== Filters
+
+==== Studie uitsluiten
+Om specifieke studies uit te sluiten van verwerken, maak het bestand ``Datamap\WSExcludeStudie.txt`` aan en zet daarin één of meer beschrijvingen van uit te sluiten studies in de vorm van een regular expression, elk op een eigen regel.
+
+==== Vak uitsluiten
+Om specifieke vakken uit te sluiten van verwerking, maak het bestand ``Datamap\WSExcludeVakcode.txt`` aan en zet daarin één of meer vakcodes van uit te sluiten vakken in de vorm van een regular expression elk op een eigen regel. 
+
+Voorbeeld: ^lo$   filtert alle vakcodes gelijk aan 'lo'
+Voorbeeld: ^me    filtert alle vakcodes beginnend met 'me'
+Voorbeeld: pws    filtert alle vakcodes waarin 'pws' voorkomt
+
+==== Klassikale vakken
+Indien het bestand ''Datamap\WSKlassikaleVakken.txt'' aanwezig is, dan wordt een lijst met vakcodes voor klassikale vakken ingelezen. Normaliter worden alleen onderbouwklassen gekoppeld aan programma's, maar voor de vakcodes in deze lijst worden klassen gekoppeld aan programma's in alle leerjaren. 
+
+=== WootsSync.ini
+
+Het configuratiebestand bevat parameters voor zowel WootsSync-ReadPhase als WootsSync-WritePhase in een tekstbestand met de naam 'WootsSync.ini'. De naam en locatie van het configuratiebestand is ``WootsSync.ini`` in dezelfde map als WootsSync-ReadPhase en WootsSync-WritePhase. Om een ander bestand te kiezen, geeft de naam en locatie van WootsSync.Ini op de commandoregel van WootsSync-ReadPhase.ps1 en WootsSync-WritePhase.ps1 met de parameter -Inifilename <bestandsnaam>. Het configuratiebestand is een bestand dat in een teksteditor is bewerken en bestaat uit een reeks van naam-waarde-paren, zoals in het voorbeeld hieronder.
+
+```
+# gecombineerd configuratiebestand voor WootsSync t.b.v. Castor College
+school=CAS
+filterdocentlocatie=Castor College
+datamap=data
+importmap=import
+tempmap=temp
+dontcare_magistersyncleerjaar=3,4,5,6
+# voor Woots connectie CAS produktie, geef hostname, school_id en token
+hostname=app.woots.nl
+school_id=988
+token=c22e6c62fed0069000633a3fb4c426988
+wootsinstantie=CAS-prod
+```
+
+De volgende waarden zijn verplicht en mogen niet worden weggelaten: schooldatamap, importmap, tempmap, hostnamne, school_id, token, wootsinstantie. 
+
+``datamap``, ``importmap`` en ``tempmap`` beduiden de naam van een map, relatief ten opzichte van de locatie van de script WootsSync-ReadPhase en WootsSync-WritePhase. 
+
+``importmap`` geeft de naam van de map waarin gegevensbestanden worden opgeslagen voor de communicatie tussen Import-Magister en ReadPhase. Kopieer hierin de uitvoer van 
+
+``datamap`` geeft de naam van de map waarin gegevensbestanden wordt opgeslagen voor de communicatie tussen ReadPhase en WritePhase, alsmedede filters voor ReadPhase.
+
+``tempmap`` geeft de naam van de map waarin ReadPhase een aantal controlebestanden opslaat. 
+
+``hostname`` is de hostname van de API eindpunt.
+
+``school_id is het identificatienummer van de school, te vinden onder instellingen, API-token.
+
+``token`` is het token dat toegang geeft tot de API, te beheren onder instellingen, API-token. 
+
+``magistersyncleerjaar`` bevat een komma-gescheiden lijst van de leerjaren waarvoor WootsSync programma's aanmaakt. Voor het beste resultaat is het aanbevolen dat WootsSync uitsluitend programma's aanmaakt voor leerjaren die worden gesynchroniseerd met Magister, zoals ingesteld in Woots→Instellingen→Magister. 
+
+== Extra's 
+
+== Known issues 
+
+WootsSync is niet in staat om docenten aan programma's toe te kennen als ze in Woots een beheerdersrol hebben.
