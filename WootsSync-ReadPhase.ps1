@@ -1,6 +1,6 @@
 <#
     WootsSync-ReadPhase.ps1
-    Versie 20241101
+    Versie 20241101b
     p.wiegmans@svok.nl
 
     WootsSync maakt programma's voor elk vak van leerlingen.
@@ -160,9 +160,10 @@ if (!$cfg.datamap) { Throw "WootsSync.ini: datamap is verplicht" }
 if (!$cfg.tempmap) { Throw "WootsSync.ini: tempmap is verplicht" }
 if (!$cfg.magistersyncleerjaar) { Throw "WootsSync.ini: magistersyncleerjaar is verplicht" }
 CfgValidateBoolean $cfg.gridview
+CfgValidateBoolean $cfg.onbekendvak_overslaan
 $leerjaren = $cfg.magistersyncleerjaar -split ','
 $usegridview = $cfg.gridview -eq '1'
-
+$skip_onbekendvak = $cfg.onbekendvak_overslaan -eq '1'
 # bestanden
 $ImportFolder = "$herepath\$($cfg.importmap)"
 $docentfile = "$ImportFolder\magister_docent.clixml"
@@ -236,7 +237,7 @@ if (Test-path $filterExclGroepFile) {
     $ExclGroepFilter = $(Get-Content -path $filterExclGroepFile) -join '|'
 }
 
-# Bewaar lijsten met alle klassen, lesgroepen, vakken, studies voor inspectie.
+# Verzamel klassen, lesgroepen, vakken, studies voor inspectie.
 $klas = [System.Collections.Generic.List[string]]::new()
 $groep = [System.Collections.Generic.List[string]]::new()
 $vak = [System.Collections.Generic.List[string]]::new()
@@ -259,10 +260,10 @@ Write-Host "Klassen:" $klas.count
 Write-Host "Vakken:" $vak.count
 write-host "Groepen:" $groep.count
 Write-Host "Studies:" $studie.count
-$klas | Out-File -FilePath "$herepath\$($cfg.tempmap)\temp-klas.txt"
-$vak | Out-File -FilePath "$herepath\$($cfg.tempmap)\temp-vak.txt"
-$groep | Out-File -FilePath "$herepath\$($cfg.tempmap)\temp-groep.txt"
-$studie | Out-File -FilePath "$herepath\$($cfg.tempmap)\temp-studie.txt"
+$klas | Out-File -FilePath "$herepath\$($cfg.tempmap)\klas.txt"
+$vak | Out-File -FilePath "$herepath\$($cfg.tempmap)\vak.txt"
+$groep | Out-File -FilePath "$herepath\$($cfg.tempmap)\groep.txt"
+$studie | Out-File -FilePath "$herepath\$($cfg.tempmap)\studie.txt"
 
 #region verzamel
 <# 
@@ -410,10 +411,13 @@ $programmafiltered = $programma | ForEach-Object {
 $programma = $programmafiltered
 Write-Host "Programma na inclusief filteren op leerjaar:" $programma.count 
 
+# filter onbekend-vak 
+if ($skip_onbekendvak) {
+    $programma = $programma | Where-Object { $_.naam -notlike "Onbekend*" }
+    Write-Host "Programma na exclusief filteren op onbekend vak:" $programma.count 
+}
 #region uitvoer
 # uitvoeren
-
-if ($usegridview) { $programma | Export-Clixml -Path $out_clixml_file }
 
 # maak platte lijst voor CSV export 
 foreach ($p in $programma) {
@@ -423,8 +427,10 @@ foreach ($p in $programma) {
 $programma | Export-csv -Path $out_csv_file -Delimiter ";" -Encoding UTF8 -NoTypeInformation
 $programma.naam | Out-File -FilePath $out_txt_file -Encoding utf8 
 
-# maak selectie voor interactieve viewer
-$programma | Out-Gridview
+# Toon programmalijst in interactieve viewer
+if ($usegridview) { 
+    $programma | Export-Clixml -Path $out_clixml_file 
+}
 
 $stopwatch.Stop()
 Write-Host ("Klaar in " + $stopwatch.Elapsed.Hours + " uur " + $stopwatch.Elapsed.Minutes + " minuten " + $stopwatch.Elapsed.Seconds + " seconden ")    

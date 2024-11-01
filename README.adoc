@@ -1,6 +1,6 @@
 = WootsSync
 
-Versie 20241101
+Versie 20241101b
 
 == Abstract
 
@@ -96,25 +96,12 @@ Indien het bestand ''Datamap\WSKlassikaleVakken.txt'' aanwezig is, dan wordt een
 
 === WootsSync.ini
 
-Het configuratiebestand bevat parameters voor zowel WootsSync-ReadPhase als WootsSync-WritePhase in een tekstbestand met de naam 'WootsSync.ini'. De naam en locatie van het configuratiebestand is ``WootsSync.ini`` in dezelfde map als WootsSync-ReadPhase en WootsSync-WritePhase. Om een ander bestand te kiezen, geeft de naam en locatie van WootsSync.Ini op de commandoregel van WootsSync-ReadPhase.ps1 en WootsSync-WritePhase.ps1 met de parameter -Inifilename <bestandsnaam>. Het configuratiebestand is een bestand dat in een teksteditor is bewerken en bestaat uit een reeks van naam-waarde-paren, zoals in het voorbeeld hieronder.
+Het configuratiebestand bevat parameters voor zowel WootsSync-ReadPhase als WootsSync-WritePhase in een tekstbestand met de naam 'WootsSync.ini'. De naam en locatie van het configuratiebestand is ``WootsSync.ini`` in dezelfde map als WootsSync-ReadPhase en WootsSync-WritePhase. Om een ander bestand te kiezen, geeft de naam en locatie van WootsSync.Ini op de commandoregel van WootsSync-ReadPhase.ps1 en WootsSync-WritePhase.ps1 met de parameter -Inifilename <bestandsnaam>. Het configuratiebestand is een bestand dat in een teksteditor is bewerken en bestaat uit een reeks van naam-waarde-paren. Voor een voorbeeld, zie https://github.com/sikkepitje/WootsSync/blob/main/WootsSync-voorbeeld.ini[``WootsSync-voorbeeld.ini``]
 
-```
-# gecombineerd configuratiebestand voor WootsSync t.b.v. Castor College
-school=CAS
-filterdocentlocatie=Castor College
-datamap=data
-importmap=import
-tempmap=temp
-dontcare_magistersyncleerjaar=3,4,5,6
-# voor Woots connectie CAS produktie, geef hostname, school_id en token
-hostname=app.woots.nl
-school_id=988
-token=c22e6c62fed0069000633a3fb4c426988
-wootsinstantie=CAS-prod
-whatif=0
-```
 
-De volgende waarden zijn verplicht en mogen niet worden weggelaten: schooldatamap, importmap, tempmap, hostnamne, school_id, token, wootsinstantie. 
+De volgende waarden zijn verplicht en mogen niet worden weggelaten: schooldatamap, importmap, tempmap, hostname, school_id, token, wootsinstantie. 
+
+``school`` is een naam die de school aanduidt in ReadPhase ten behoeve van het kiezen van de juiste logica voor het bepalen van lesgroep- en klasnamen.
 
 ``datamap``, ``importmap`` en ``tempmap`` beduiden de naam van een map, relatief ten opzichte van de locatie van de script WootsSync-ReadPhase en WootsSync-WritePhase. 
 
@@ -123,6 +110,8 @@ De volgende waarden zijn verplicht en mogen niet worden weggelaten: schooldatama
 ``datamap`` geeft de naam van de map waarin gegevensbestanden wordt opgeslagen voor de communicatie tussen ReadPhase en WritePhase, alsmedede filters voor ReadPhase.
 
 ``tempmap`` geeft de naam van de map waarin ReadPhase een aantal controlebestanden opslaat. 
+
+``wootsinstantie`` is een vrij te kiezen naam die de Woots-instantie aanduidt in WritePhase voor gebruik in logs en cache-bestandsnamen.
 
 ``hostname`` is de hostname van de API eindpunt.
 
@@ -137,6 +126,8 @@ De volgende waarden zijn verplicht en mogen niet worden weggelaten: schooldatama
 ``do_remove_instructors`` is een schakelaar, 0 betekent: laat staan, 1 betekent: verwijder docenten uit programma's indien ze niet meer voorkomen in de door ReadPhase aangemaakte lijst.
 
 ``gridview`` is een schakelaar: 1 betekent: ReadPhase toont interactief het resultaat in een GridView-venster. Het programma is dan niet meer geschikt om uit te voeren als geplande taak zonder toezicht (unattended). 
+
+``onbekendvak_overslaan`` is een schakelaar. 1 betekent dat ReadPhase vakken in de uitvoer overslaat, die niet konden worden gekoppeld aan een bekende vakomschrijving. 
 
 == Extra's 
 

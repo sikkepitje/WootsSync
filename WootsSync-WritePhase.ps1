@@ -1,6 +1,6 @@
 <#
     WootsSync-WritePhase.ps1
-    Versie 20241101
+    Versie 20241101b
     p.wiegmans@svok.nl
 
     Verzorgt synchronisatie van Woots met Magister. 
@@ -140,7 +140,7 @@ if (!$cfg.school_id) { Throw "WootsSync.ini: school_id is verplicht" }
 if (!$cfg.token) { Throw "WootsSync.ini: token is verplicht" }
 if (!$cfg.wootsinstantie) { Throw "WootsSync.ini: wootsinstantie is verplicht" }
 CfgValidateBoolean $cfg.whatif
-CfgValidateBoolean $cfg.whatif
+CfgValidateBoolean $cfg.do_remove_instructors
 $whatif = $cfg.whatif -eq '1'
 $do_remove_instructors = $cfg.do_remove_instructors -eq '1'
 if ($whatif) {Write-Log Notice "Whatif: $whatif"}

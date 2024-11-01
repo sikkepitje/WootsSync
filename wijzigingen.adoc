@@ -1,0 +1,6 @@
+# Wijzigingen
+
+## 20241101b
+
+- (readphase) toegevoegd mogelijkheid om te filteren op onbekend-vak; toegevoegd configuratievariabele onbekendvak_overslaan.
+
