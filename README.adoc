@@ -1,10 +1,12 @@
 = WootsSync
 
-Versie 20241018
+Versie 20241101
 
 == Abstract
 
-WootsSync synchroniseert programma's in https://app.woots.nl[Woots] met gegevens die worden gelezen uit Magister. Het maakt programma's aan of werkt deze bij, door de docenten, klassen en legroepen te synchroniseren met de informatie in Magister. Magister is een veelgebruikt schooladministratiesysteem voor het voortgezet onderwijs in Nederland. Woots is een digitaal toetsplatformen toetsbibliotheek.
+WootsSync synchroniseert programma's in https://app.woots.nl[Woots] met https://magister.nl/[Magister]. Het maakt programma's aan of werkt deze bij, door hieraan de juiste docenten, klassen en legroepen te koppelen. https://magister.nl/[Magister] is een veelgebruikt schooladministratiesysteem voor het voortgezet onderwijs in Nederland. https://app.woots.nl[Woots] is een digitaal toetsplatform en toetsbibliotheek. 
+
+WootsSync bevat schoolspecifieke logica. Het is zaak om deze aan te passen naar eigen wens of behoefte.
 
 == Vereisten
 
@@ -16,64 +18,68 @@ Dit script vereist:
 
 == Installatie
 
-Download de bestanden uit GitHub en plaats ze in een map naar keuze. Maak hierin een map met de naam ``Data``. Zorg ervoor dat aan de bovengenoemde vereisten is voldaan.
+* Download alle bestanden uit de https://github.com/sikkepitje/WootsSync[WootsSync repository] en plaats ze in een map naar keuze. 
+* Maak een API-token aan: log in als beheerder, kies avatar→instellingen→API-token en klik op "Generate new token". Noteer School_id en token.
+* Schrijf de gewenste instellingen in ``WootsSync.ini`` . Maak eventueel de gewenste mappen en zet de vereiste invoerbestanden klaar.
 
 == Gebruik
 
-Haal de gegevens op uit Magister met behulp van ``Import-Magister.ps1``. Raadpleeg de documentatie op [TeamSync] voor uitleg over het gebruik. Kopieer de bestanden ``magister_leerling.clixml``, ``magister_docent.clixml`` en ``magister_vak.clixml`` naar de datamap.
+WootsSync bestaat uit 3 scripts die achtereenvolgens worden uitgevoerd.
 
-Haal een API-token op uit Woots. Dit doe je door in te loggen als beheerder in Woots, klik op je avatar, kies instellingen, kies API-token en klik op "Generate new token". Vul het token en de school_id in een aanroep naar ``Initialize-Woots`` als volgt: ``Initialize-Woots -hostname 'app.woots.nl' -school_id {school_id} -token {token}`` 
-
-Voer ``WootsSync-ReadPhase.ps1`` uit. Controleer vervolgens het resultaat door het bestand ``data\wootssync.csv`` te inspecteren. Wanneer je tevreden bent met het resultaat, voer daarna ``WootsSync-WritePhase.ps1`` uit om de programma's aan te maken in Woots. 
+* ``Import-Magister.ps1`` haalt gegevens op uit Magister.
+* ``WootsSync-ReadPhase.ps1`` bepaalt Woots-programma's.
+* ``WootsSync-WritePhase.ps1`` werkt in Woots de programma's bij.
 
 == Documentatie 
 
 === Import-Magister
-Het script ``Import-Magister.ps1`` haalt leerlingen, docenten en vakken op uit Magister. ``Import-Magister.ps1`` vind je in de https://github.com/sikkepitje/teamsync[TeamSync repository]. Het resultaat zijn de volgende bestanden:
+Het script ``Import-Magister.ps1`` maakt verbinding met Magister Webservices en haalt leerlingen, docenten en vakken op. Zie de documentatie op https://github.com/sikkepitje/TeamSync[TeamSync GitHub repository]. 
+
+Het script genereert de volgende bestanden:
 
 * ``magister_leerlingen.clixml``
 * ``magister_docenten.clixml``
 * ``magister_vak.clixml``
 
-Deze bestanden moeten worden geplaatst in de Datamap en worden ingelezen door WritePhase.
+Deze bestanden moeten worden klaargezet in de WootsSync-importmap en worden ingelezen door WritePhase.
 
 === WootsSync-ReadPhase
-Het script ``WootsSync-ReadPhase.ps1`` leest deze bestanden in en bouwt een 
-lijst met programma's op. Het genereert een programmanaam voor elke unieke 
+Het script ``WootsSync-ReadPhase.ps1`` leest de bestanden aangemaakt door Import-Magister en bouwt een 
+lijst met programma's op. Het genereert een Woots-programma voor elke unieke 
 combinatie van leerjaar, studie en vak en koppelt de klassen en docenten 
 hieraan. Het doet dit als volgt. 
 
 1. Het telt alle leerlingen af, en 
- .. voor elke leerling loopt alle lesgroepen af. Het splitst de naam van de lesgroep. Het deel  vóór de punt wordt gesplitst in leerjaar (1,2,3,4,5 of 6) en studie ('b','h','m' of'v') en het deel na de punt wordt  geinterpreteerd als vakcode. Het zoekt de vakomschrijving op voor elke vakcode. Het bouwt nu een programmanaam op door combineren van  leerjaar, studie en vakomschrijving. Het voegt de lesgroep van de leerling toe aan het programma. 
- .. indien onderbouw (leerjaar =< 3), loopt alle vakken af. Voor elke combinatie van leerjaar,  studie en vak voegt de klas van de leerling toe aan het respectievelijke programma. Het maakt  het programma aan, indien deze nog  niet bestaat. 
+ .. voor elke leerling loopt alle lesgroepen af. Het splitst de naam van de lesgroep. Het bepaalt afdeling en vakcode op basis van schoolspecifieke logica. Het zoekt de vakomschrijving op voor elke vakcode. Het bouwt nu een programmanaam op door combineren van afdeling en vakomschrijving. Het voegt de lesgroep van de leerling toe aan het programma. 
+ .. indien onderbouw (leerjaar =< 3), loopt alle vakken af. Voor elke combinatie van afdeling en vak voegt de klas van de leerling toe aan het respectievelijke programma. Het maakt het programma aan, indien deze nog  niet bestaat. 
 2. Het telt alle docenten af, 
- .. telt alle groepvakken af. Voor elk groepvak, bepaalt leerjaar en studie uit de klas en vak uit de vakcode en voegt de docent toe aan het respectievelijke programma, indien  deze bestaat. 
- .. telt alle klasvakken af
- .. telt alle docentvakken af. Het bepaalt leerjaar en studie uit de klas, en voegt voor elke combinatie van leerjaar, studie en vak de docent toe aan het respectievelijke programma, indien deze bestaat. 
+ .. telt alle groepvakken af. Voor elk groepvak, bepaalt afdeling en vak en voegt de docent toe aan het respectievelijke programma, indien  deze bestaat. 
+ .. telt alle klasvakken af en telt alle docentvakken af. Het bepaalt afdeling en voegt voor elke combinatie van afdeling en vak de docent toe aan het respectievelijke programma, indien deze bestaat. 
 
-``WootsSync-ReadPhase.ps1`` maakt hierbij gebruik van een of meer filters in 
-bestanden in de Datamap. Zie onder voor uitleg.
+WootsSync-ReadPhase maakt gebruik van een of meer filters in 
+bestanden in de datamap. Zie onder voor uitleg.
 
-Het resultaat wordt bewaard in de datamap in de volgende bestanden.
+WootsSync-ReadPhase genereert de volgende bestanden in de datamap:
 
-* ``WootsSync.clixml``
-* ``WootsSync.csv``
+* ``WootsSync.clixml`` bevat een lijst met programma's in XML,
+* ``WootsSync.csv`` bevat een lijst met programma's in CSV,
 * ``WootsSync.txt`` bevat een lijst met programmanamen.
 
-Open deze bestanden om het te verwachten resultaat te beoordelen. 
+Het resultaat kan worden beoordeeld in deze bestanden. Indien alles in orde is, ga door met ``WootsSync-WritePhase.ps1`` om de programma's aan te maken in Woots. 
 
 === WootsSync-WritePhase
-Het script ``WootsSync-WritePhase.ps1`` leest ``WootsSync.clixml`` en loopt alle programma's in deze lijst langs en brengt ze in Woots in overeenstemming hiermee.
+Het script ``WootsSync-WritePhase.ps1`` maakt verbinding met de Woots API, leest ``WootsSync.clixml``, loopt alle programma's af en werkt de programma's in Woots bij door de verschillen naar Woots te schrijven.
 
-Docentcodes worden aangevuld met '@jpthijsse.nl' om een geldig e-mail te genereren. De betreffende docent wordt met dit e-mail in Woots opgezocht.
+* indien het programma niet bestaat in Woots en het zou volgens het lijst wel moeten bestaan, dan wordt het aangemaakt. 
+* indien een groep (klas of lesgroep) niet gekoppeld is aan het programma en het zou volgend de lijst wel lid gekoppeld moeten zijn, dan wordt de groep gekoppeld.
+* indien een groep (klas of lesgroep) wel gekoppeld is aan het programma en het zou volgend de lijst niet lid gekoppeld moeten zijn, dan wordt de groep afgekoppeld.
+* indien een docent niet lid is van het programma, dan wordt de docent gekoppeld. 
 
-* Het programma wordt aangemaakt, indien het niet bestaat.
-* De klassen worden aan het programma gekoppeld.
-* de lesgroepen worden het programma gekoppeld.
-* De docenten worden aan het programma gekoppeld, indien ze nog niet gekoppeld 
-zijn.
+(AANPASSEN) Docentcodes worden aangevuld met '@jpthijsse.nl' om een geldig e-mail te genereren. De betreffende docent wordt met dit e-mail in Woots opgezocht.
 
 === Filters
+
+De volgende filters kunnen worden gedefinieerd om de door ReadPhase aangemaakte lijst programma's te beinvloeden. 
 
 ==== Studie uitsluiten
 Om specifieke studies uit te sluiten van verwerken, maak het bestand ``Datamap\WSExcludeStudie.txt`` aan en zet daarin één of meer beschrijvingen van uit te sluiten studies in de vorm van een regular expression, elk op een eigen regel.
@@ -105,6 +111,7 @@ hostname=app.woots.nl
 school_id=988
 token=c22e6c62fed0069000633a3fb4c426988
 wootsinstantie=CAS-prod
+whatif=0
 ```
 
 De volgende waarden zijn verplicht en mogen niet worden weggelaten: schooldatamap, importmap, tempmap, hostnamne, school_id, token, wootsinstantie. 
@@ -125,8 +132,18 @@ De volgende waarden zijn verplicht en mogen niet worden weggelaten: schooldatama
 
 ``magistersyncleerjaar`` bevat een komma-gescheiden lijst van de leerjaren waarvoor WootsSync programma's aanmaakt. Voor het beste resultaat is het aanbevolen dat WootsSync uitsluitend programma's aanmaakt voor leerjaren die worden gesynchroniseerd met Magister, zoals ingesteld in Woots→Instellingen→Magister. 
 
+``whatif`` is een schakelaar die bepaalt of Write-Phase wijzigingen in Woots aanbrengt ten behoeve van testen en debuggen. 0 betekent: schrijf wijzigingen, 1 betekent: doe alsof, schrijf geen wijzigingen.
+
+``do_remove_instructors`` is een schakelaar, 0 betekent: laat staan, 1 betekent: verwijder docenten uit programma's indien ze niet meer voorkomen in de door ReadPhase aangemaakte lijst.
+
+``gridview`` is een schakelaar: 1 betekent: ReadPhase toont interactief het resultaat in een GridView-venster. Het programma is dan niet meer geschikt om uit te voeren als geplande taak zonder toezicht (unattended). 
+
 == Extra's 
 
 == Known issues 
 
 WootsSync is niet in staat om docenten aan programma's toe te kennen als ze in Woots een beheerdersrol hebben.
+
+== To Do
+
+* toevoegen docenten die ook beheerder zijn.

@@ -1,6 +1,6 @@
 <#
     WootsSync-WritePhase.ps1
-    Versie 20241018
+    Versie 20241101
     p.wiegmans@svok.nl
 
     Verzorgt synchronisatie van Woots met Magister. 
@@ -60,9 +60,6 @@ $coursecacheinvalidated = $False
 $filename_log = $null       # we loggen alleen naar console
 $numbertoprocess = 999999
 $verwerkingslimiet = 999999
-$whatif = $false
-#$whatif = $true  
-$also_remove_instructors = $false
 
 #region functies
 # ========  FUNCTIES  ========
@@ -124,6 +121,11 @@ function Test-NeedsUpdate($Path) {
     }
     return $True 
 }
+function CfgValidateBoolean ($value) {
+    if ($value -eq '0' -or $value -eq '1') { return} 
+    Throw "Config variabele $value is niet een geldige boolean waarde"
+}
+
 #endregion functies
 #region main
 # ========  MAIN  ========
@@ -137,9 +139,14 @@ if (!$cfg.hostname) { Throw "WootsSync.ini: hostname is verplicht" }
 if (!$cfg.school_id) { Throw "WootsSync.ini: school_id is verplicht" }
 if (!$cfg.token) { Throw "WootsSync.ini: token is verplicht" }
 if (!$cfg.wootsinstantie) { Throw "WootsSync.ini: wootsinstantie is verplicht" }
+CfgValidateBoolean $cfg.whatif
+CfgValidateBoolean $cfg.whatif
+$whatif = $cfg.whatif -eq '1'
+$do_remove_instructors = $cfg.do_remove_instructors -eq '1'
+if ($whatif) {Write-Log Notice "Whatif: $whatif"}
 
 Initialize-Woots -hostname $cfg.hostname -school_id $cfg.school_id -token $cfg.token
-Write-Log Notice "Verbonden met Woots $($cfg.wootsinstantie) !"
+Write-Log Notice "Verbonden met Woots $($cfg.wootsinstantie)"
 
 $coursecachefile = "$automationDataFolder\Woots-$($cfg.wootsinstantie)-CourseCache.clixml"
 $classcachefile = "$automationDataFolder\Woots-$($cfg.wootsinstantie)-ClassCache.clixml"
@@ -305,7 +312,7 @@ foreach ($prog in $programma) {
                 }
             }
             # verwijder instructors die geen docent zijn
-            if ($also_remove_instructors) {
+            if ($do_remove_instructors) {
                 $instructors = Get-WootsCourseCoursesUser -id $course.id | Where-Object { $_.role -eq "instructor" }
                 foreach ($docent in $instructors) {
                     # instructors aftellen

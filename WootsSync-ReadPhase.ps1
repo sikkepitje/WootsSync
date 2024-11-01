@@ -1,6 +1,6 @@
 <#
     WootsSync-ReadPhase.ps1
-    Versie 20241018
+    Versie 20241101
     p.wiegmans@svok.nl
 
     WootsSync maakt programma's voor elk vak van leerlingen.
@@ -71,6 +71,7 @@ function Assertfile($Path) {
 
 function Capitalize($naam) {
     return $naam.substring(0, 1).toupper() + $naam.substring(1)
+    # niet helemaal hetzelfde: (Get-Culture).TextInfo.ToTitleCase($string)
 }
 
 function GetAddProgram($key, $leerjaar, $studie, $vak) {
@@ -104,13 +105,6 @@ function Add-ProgramVakFiltered($leerjaar, $studie, $vak, $newclass) {
     }
 }
 function Add-ProgramDocent($studie, $leerjaar, $vak, $docent) {
-    #$leerjaar = $gv.klas.substring(0, 1)
-    #if ($leerjaar -eq 1) {
-    #    $studie = "B"
-    #}
-    #else {
-    #    $studie = $gv.klas.substring(1, 1)
-    #}
     $key = "{0}{1}-{2}" -f ($studie, $leerjaar, $vak)
     if ($programma.ContainsKey($key)) {
         $p = $programma[$key]
@@ -147,6 +141,10 @@ function Splits($s) {
     $parts += $part # voeg de rest toe als element aan de array
     return $parts
 }
+function CfgValidateBoolean ($value) {
+    if ($value -eq '0' -or $value -eq '1') { return } 
+    Throw "Config variabele $value is niet een geldige boolean waarde"
+}
 
 #endregion functies
 #region main
@@ -161,8 +159,9 @@ if (!$cfg.importmap) { Throw "WootsSync.ini: importmap is verplicht" }
 if (!$cfg.datamap) { Throw "WootsSync.ini: datamap is verplicht" }
 if (!$cfg.tempmap) { Throw "WootsSync.ini: tempmap is verplicht" }
 if (!$cfg.magistersyncleerjaar) { Throw "WootsSync.ini: magistersyncleerjaar is verplicht" }
-
+CfgValidateBoolean $cfg.gridview
 $leerjaren = $cfg.magistersyncleerjaar -split ','
+$usegridview = $cfg.gridview -eq '1'
 
 # bestanden
 $ImportFolder = "$herepath\$($cfg.importmap)"
@@ -231,7 +230,7 @@ $ExclVakFilter = $null
 if (Test-path $filterExclVakFile) {
     $ExclVakFilter = $(Get-Content -path $filterExclVakFile) -join '|'
 }
-# laad vakuitsluitfilter
+# laad groepuitsluitfilter
 $ExclGroepFilter = $null
 if (Test-path $filterExclGroepFile) {
     $ExclGroepFilter = $(Get-Content -path $filterExclGroepFile) -join '|'
@@ -267,10 +266,9 @@ $studie | Out-File -FilePath "$herepath\$($cfg.tempmap)\temp-studie.txt"
 
 #region verzamel
 <# 
-Maak programma's aan op studie, jaar en vak, en voeg leerlingen toe.
-De (les)groep in Magister is opgebouwd uit (Magister)studie, punt, vakcode, volgnummer.
-Magisterstudie is opgebouwd uit onderwijssoortcode (bijv v, h, m) en leerjaar.
-Study in Woots is bevat alleen onderwijssoortcode. 
+Maak programma's aan op afdeling en vak en voeg docenten en leerlingen toe.
+De klas/lesgroep in Magister is opgebouwd uit afdeling, punt, vakcode, volgnummer.
+Afdeling is opgebouwd uit studie (bijv v, h, m) en leerjaar.
 #>
 
 foreach ($l in $leerling) {
@@ -286,9 +284,8 @@ foreach ($l in $leerling) {
     }
     
     if ($l.Groepen.count -gt 0) {
-        # HIER VERDER !
         foreach ($g in $l.groepen) {
-            if ($g.length -gt 1 -and $g.contains('.')) {
+            if ($g.contains('.')) {
                 # skip raar geval waar leerling geen groepen heeft, en lijst heeft 1 element van lengte 1 met niets.
                 switch ($cfg.school) {
                     'JPT' {
@@ -330,26 +327,21 @@ foreach ($l in $leerling) {
         Write-Host "! Leerling heeft geen groepen:" $l.Email $l.Id $l.Achternaam
     }
 }
-<#
-switch ($cfg.school) {
-    'JPT' {}
-    'CAS' {}
-}
-#>
+
 Write-Host "Zoek programma's bij docenten..."
 # zoek programma's bij docenten
 foreach ($d in $docent) {
     foreach ($gv in $d.groepvakken) {
-        if ($gv.klas.length -ge 1 -and $g.contains('.')) {
+        if ($g.contains('.')) {
             switch ($cfg.school) {
                 'JPT' {
-                    $studie = $gv.Klas.split('.')[0]
-                    $leerjaar, $wstudy, $rest = splits $studie
+                    $afdeling = $gv.Klas.split('.')[0]
+                    $leerjaar, $wstudy, $rest = splits $afdeling
                     Add-ProgramDocent -studie $wstudy -leerjaar $leerjaar -vak $gv.vakcode -docent $d.id
                 }
                 'CAS' {
-                    $studie = $gv.Klas.split('.')[0]
-                    $wstudy, $leerjaar, $rest = splits $studie
+                    $afdeling = $gv.Klas.split('.')[0]
+                    $wstudy, $leerjaar, $rest = splits $afdeling
                     Add-ProgramDocent -studie $wstudy -leerjaar $leerjaar -vak $gv.vakcode -docent $d.id
                 }
             }
@@ -357,20 +349,16 @@ foreach ($d in $docent) {
     }
     # tel alle klasvakken en docentvakken af, test op lege lijst uitzondering 
     foreach ($kv in $d.klasvakken) {
-        if ($kv.length -gt 1) {
-            foreach ($dv in $d.docentvakken) {
-                if ($dv.length -gt 1) {
-                    switch ($cfg.school) {
-                        'JPT' {
-                            $leerjaar = $kv.substring(0, 1)
-                            $wstudy = $kv.substring(1, 1)
-                            Add-ProgramDocent -Studie $wstudy -leerjaar $leerjaar -vak $dv -docent $d.id
-                        }
-                        'CAS' {
-                            $wstudy, $leerjaar, $rest = splits $kv
-                            Add-ProgramDocent -Studie $wstudy -leerjaar $leerjaar -vak $dv -docent $d.id
-                        }
-                    }
+        foreach ($dv in $d.docentvakken) {
+            switch ($cfg.school) {
+                'JPT' {
+                    $leerjaar = $kv.substring(0, 1)
+                    $wstudy = $kv.substring(1, 1)
+                    Add-ProgramDocent -Studie $wstudy -leerjaar $leerjaar -vak $dv -docent $d.id
+                }
+                'CAS' {
+                    $wstudy, $leerjaar, $rest = splits $kv
+                    Add-ProgramDocent -Studie $wstudy -leerjaar $leerjaar -vak $dv -docent $d.id
                 }
             }
         }
@@ -396,15 +384,6 @@ foreach ($p in $programma.Values) {
         }
     }
     $p.Naam = "$vaknaam $club"
-    # voeg domeinsuffix toe om volledige emails te krijgen
-    switch ($cfg.school) {
-        'JPT' {
-            $p.docenten = $p.docenten | ForEach-Object { $_ + '@jpthijsse.nl' }
-        }
-        'CAS' {
-            # CAS: niet nodig want Magister.id == e-mail
-        }
-    }
 }
 
 # maak platte lijst
@@ -434,7 +413,7 @@ Write-Host "Programma na inclusief filteren op leerjaar:" $programma.count
 #region uitvoer
 # uitvoeren
 
-$programma | Export-Clixml -Path $out_clixml_file 
+if ($usegridview) { $programma | Export-Clixml -Path $out_clixml_file }
 
 # maak platte lijst voor CSV export 
 foreach ($p in $programma) {
