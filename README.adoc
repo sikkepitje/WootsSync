@@ -115,7 +115,7 @@ De volgende waarden zijn verplicht en mogen niet worden weggelaten: schooldatama
 
 ``hostname`` is de hostname van de API eindpunt.
 
-``school_id is het identificatienummer van de school, te vinden onder instellingen, API-token.
+``school_id`` is het identificatienummer van de school, te vinden onder instellingen, API-token.
 
 ``token`` is het token dat toegang geeft tot de API, te beheren onder instellingen, API-token. 
 
