@@ -1,6 +1,6 @@
 <#
     WootsSync-WritePhase.ps1
-    Versie 20241101b
+    Versie 20260115
     p.wiegmans@svok.nl
 
     Verzorgt synchronisatie van Woots met Magister. 
@@ -27,6 +27,8 @@
     Changes
     20231013 : 
     * koppelt klassen af indien nodig
+    20260115
+    * Usertable vertaling van UPN toegevoegd.
 #>
 [CmdletBinding()]
 param (
@@ -41,13 +43,14 @@ Import-Module Woots
 $stopwatch = [Diagnostics.Stopwatch]::StartNew()
 $herePath = Split-Path -parent $MyInvocation.MyCommand.Definition
 $inifile = "$herepath\$Inifilename"
+$usertablefilename = "$herepath\WootsSync-UserTable.txt"
 
 # ========  VARIABELEN  ========
 if ($env:computername -eq "EDUCONNECTOR") {
-    $automationDataFolder = "C:\Automation\_Data"
+    $cacheFolder = "C:\Automation\Temp"
 }
 else {
-    $automationDataFolder = "$([environment]::getfolderpath('mydocuments'))\Automation\_Data"
+    $cacheFolder = "$([environment]::getfolderpath('mydocuments'))\Automation\Temp"
 }
 $wootsSyncDataFolder = "$herepath\Data"
 $wootssyncdatafile = "$wootsSyncDataFolder\WootsSync.clixml"
@@ -60,6 +63,7 @@ $coursecacheinvalidated = $False
 $filename_log = $null       # we loggen alleen naar console
 $numbertoprocess = 999999
 $verwerkingslimiet = 999999
+$usertable = @{}
 
 #region functies
 # ========  FUNCTIES  ========
@@ -75,7 +79,7 @@ Function Sync-Log ($Path) {
     }
     if ($script:filename_log) {
         # hebben we de naam van het logbestand?
-        $loglines | Out-File -FilePath $filename_log -Append
+        $loglines | Out-File -FilePath $filename_log -Append -Encoding UTF8
         $script:loglines = @()
     }
 }
@@ -122,9 +126,26 @@ function Test-NeedsUpdate($Path) {
     return $True 
 }
 function CfgValidateBoolean ($value) {
-    if ($value -eq '0' -or $value -eq '1') { return} 
+    if ($value -eq '0' -or $value -eq '1') { return } 
     Throw "Config variabele $value is niet een geldige boolean waarde"
 }
+
+function Add-CourseDocent($docent, $Course) {
+    if ($docent.id -notin $course.instructors.user_id) {
+        $naam = "{0} {1} {2} ({3})" -f ($docent.first_name, $docent.middle_name, $docent.last_name, $upn)
+        if (!$whatif) {
+            Write-Log info ("($($teller)/$($totaal)) +Docent $prognaam : {0} {1}" -f ($docent.id, $naam))
+            $result = Add-WootsCourseCoursesUser -id $course.id -Parameter @{user_id = $docent.id; role = "instructor" }
+            if (!$result) {
+                Write-Log warn "$(Get-WootsLastError)"
+            }
+        }
+        else {
+            Write-Log whatif "($($teller)/$($totaal)) +Docent $prognaam : $naam"
+        }
+    }
+}
+
 
 #endregion functies
 #region main
@@ -143,19 +164,30 @@ CfgValidateBoolean $cfg.whatif
 CfgValidateBoolean $cfg.do_remove_instructors
 $whatif = $cfg.whatif -eq '1'
 $do_remove_instructors = $cfg.do_remove_instructors -eq '1'
-if ($whatif) {Write-Log Notice "Whatif: $whatif"}
+$do_remove_classes = $cfg.do_remove_classes -eq '1'
+if ($whatif) { Write-Log Notice "Whatif: $whatif" }
+
+# lees usertable 
+if (test-Path $usertablefilename) {
+    $usertable = Get-Content $usertablefilename -Encoding UTF8 | ConvertFrom-StringData
+    Write-Log info ("Usertable geladen met {0} items" -f $usertable.count)
+}
 
 Initialize-Woots -hostname $cfg.hostname -school_id $cfg.school_id -token $cfg.token
 Write-Log Notice "Verbonden met Woots $($cfg.wootsinstantie)"
 
-$coursecachefile = "$automationDataFolder\Woots-$($cfg.wootsinstantie)-CourseCache.clixml"
-$classcachefile = "$automationDataFolder\Woots-$($cfg.wootsinstantie)-ClassCache.clixml"
-$usercachefile = "$automationDataFolder\Woots-$($cfg.wootsinstantie)-UserCache.clixml"
+New-Item -Path $cacheFolder -ItemType Directory -ErrorAction:SilentlyContinue
+$coursecachefile = "$cacheFolder\Woots-$($cfg.wootsinstantie)-CourseCache.clixml"
+$classcachefile = "$cacheFolder\Woots-$($cfg.wootsinstantie)-ClassCache.clixml"
+$usercachefile = "$cacheFolder\Woots-$($cfg.wootsinstantie)-UserCache.clixml"
 
 Assertfile $wootssyncdatafile
 Write-Log info "Huidig jaar: $huidigjaar"
 $programma = Import-Clixml -Path $wootssyncdatafile 
-foreach ($prog in $programma) { $prog.id = $prog.id -as [int] } # maak numeriek sorteren mogelijk
+foreach ($prog in $programma) {
+    # maak numeriek sorteren mogelijk
+    $prog.id = $prog.id -as [int] 
+} 
 Write-Log info ("Programma's totaal {0}" -f $programma.count)
 $programma = $programma | Select-Object -First $numbertoprocess
 Write-Log info ("Programma's te verwerken {0}" -f $programma.count)
@@ -266,45 +298,41 @@ foreach ($prog in $programma) {
         }    
 
         # Klassen afkoppelen
-        $courseclasses = Get-WootsCourseCoursesClass -id $course.id
-        foreach ($c in $courseclasses) {
-            $klas = $wclasses | Where-Object { $_.id -eq $c.class_id }
-            if ($klas.name) {
-                if ($klas.name -notin $prog.classes) {
-                    if (!$whatif) {
-                        Write-Log info "($($teller)/$($totaal)) -Klas $prognaam : $($klas.name)"
-                        $result = Remove-WootsCoursesClass -id $c.id
-                        if (!$result) {
-                            Write-Log warn "$(Get-WootsLastError)"
+        if ($do_remove_classes) {
+            $courseclasses = Get-WootsCourseCoursesClass -id $course.id
+            foreach ($c in $courseclasses) {
+                $klas = $wclasses | Where-Object { $_.id -eq $c.class_id }
+                if ($klas.name) {
+                    if ($klas.name -notin $prog.classes) {
+                        if (!$whatif) {
+                            Write-Log info "($($teller)/$($totaal)) -Klas $prognaam : $($klas.name)"
+                            $result = Remove-WootsCoursesClass -id $c.id
+                            if (!$result) {
+                                Write-Log warn "$(Get-WootsLastError)"
+                            }
+                        }
+                        else {
+                            Write-Log whatif "($($teller)/$($totaal)) -Klas $prognaam : $($klas.name)"
                         }
                     }
-                    else {
-                        Write-Log whatif "($($teller)/$($totaal)) -Klas $prognaam : $($klas.name)"
-                    }
                 }
-            }
+            }    
         }
+
         # Koppel docenten
         if ($prog.docenten) {
             # synchroniseer docenten met de instructors
             $progdocentid = @()
             # voeg docenten toe die geen instructor zijn
             foreach ($upn in ($prog.docenten)) { 
+                if ($usertable.Keys.Contains($upn)) {
+                    $altupn = $usertable.$upn
+                    Write-Log info "    User $upn vertaald naar $altupn"
+                    $upn = $altupn
+                }
                 if ($upnuser.ContainsKey($upn)) {
                     $docent = $upnuser[$upn] # de docent bestaat in Woots
-                    if ($docent.id -notin $course.instructors.user_id) {
-                        $naam = "{0} {1} {2} ({3})" -f ($docent.first_name, $docent.middle_name, $docent.last_name, $upn)
-                        if (!$whatif) {
-                            Write-Log info ("($($teller)/$($totaal)) +Docent $prognaam : {0} {1}" -f ($docent.id, $naam))
-                            $result = Add-WootsCourseCoursesUser -id $course.id -Parameter @{user_id = $docent.id; role = "instructor" }
-                            if (!$result) {
-                                Write-Log warn "$(Get-WootsLastError)"
-                            }
-                        }
-                        else {
-                            Write-Log whatif "($($teller)/$($totaal)) +Docent $prognaam : $naam"
-                        }
-                    }
+                    Add-CourseDocent $docent $course
                     $progdocentid += $docent.id
                 }
                 else {
@@ -332,6 +360,7 @@ foreach ($prog in $programma) {
                         else {
                             Write-Log Whatif "($($teller)/$($totaal)) -Instructor $prognaam : $naam"
                         }
+
                     }
                 }
             }

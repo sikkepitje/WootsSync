@@ -4,3 +4,11 @@
 
 - (readphase) toegevoegd mogelijkheid om te filteren op onbekend-vak; toegevoegd configuratievariabele onbekendvak_overslaan.
 
+## 20241106
+
+- (writephase) toegevoegd configuratieparameter do_remove_classes = {0|1}; verwijder niet-gekoppelde klassen uit programma's. 
+- (writephase) gewijzigd cachefolder locatie.
+
+## 20260115
+
+- (writephase) toegevoegd vertaaltabel voor docenten met afwijkende UPN

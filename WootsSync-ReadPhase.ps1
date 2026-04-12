@@ -147,7 +147,7 @@ function CfgValidateBoolean ($value) {
 }
 
 #endregion functies
-#region main
+#region main-init
 # ========  MAIN  ========
 Write-Host "========  $(Split-Path -Leaf $MyInvocation.MyCommand.Definition)  ========"
 
@@ -164,6 +164,7 @@ CfgValidateBoolean $cfg.onbekendvak_overslaan
 $leerjaren = $cfg.magistersyncleerjaar -split ','
 $usegridview = $cfg.gridview -eq '1'
 $skip_onbekendvak = $cfg.onbekendvak_overslaan -eq '1'
+
 # bestanden
 $ImportFolder = "$herepath\$($cfg.importmap)"
 $docentfile = "$ImportFolder\magister_docent.clixml"
@@ -272,6 +273,7 @@ De klas/lesgroep in Magister is opgebouwd uit afdeling, punt, vakcode, volgnumme
 Afdeling is opgebouwd uit studie (bijv v, h, m) en leerjaar.
 #>
 
+$lijst = @()
 foreach ($l in $leerling) {
     switch ($cfg.school) {
         'JPT' {
@@ -286,6 +288,10 @@ foreach ($l in $leerling) {
     
     if ($l.Groepen.count -gt 0) {
         foreach ($g in $l.groepen) {
+            $label = "lgrp $wstudy $leerjaar $g"
+            if ($label -notin $lijst) {
+                $lijst += $label
+            }
             if ($g.contains('.')) {
                 # skip raar geval waar leerling geen groepen heeft, en lijst heeft 1 element van lengte 1 met niets.
                 switch ($cfg.school) {
@@ -308,6 +314,11 @@ foreach ($l in $leerling) {
     }    
     if ($l.Vakken.count -gt 0) {
         foreach ($v in $l.Vakken) {
+            $label = "lvak $wstudy $leerjaar $v"
+            if ($label -notin $lijst) {
+                $lijst += $label
+            }
+
             switch ($cfg.school) {
                 'JPT' { 
                     if ($leerjaar -le 3 -or $v -in $klassikaleVakken) {
@@ -333,24 +344,35 @@ Write-Host "Zoek programma's bij docenten..."
 # zoek programma's bij docenten
 foreach ($d in $docent) {
     foreach ($gv in $d.groepvakken) {
-        if ($g.contains('.')) {
-            switch ($cfg.school) {
-                'JPT' {
-                    $afdeling = $gv.Klas.split('.')[0]
-                    $leerjaar, $wstudy, $rest = splits $afdeling
-                    Add-ProgramDocent -studie $wstudy -leerjaar $leerjaar -vak $gv.vakcode -docent $d.id
+        $label = "dgrv $($gv.klas) $($gv.Vakcode)"
+        if ($label -notin $lijst) {
+            $lijst += $label
+        }
+
+        switch ($cfg.school) {
+            'JPT' {
+                $afdeling = $gv.Klas.split('.')[0]
+                $leerjaar, $wstudy, $rest = splits $afdeling
+                if ($leerjaar -eq '1') {
+                    $wstudy = 'B' # op JPT is 1e leerjaar altijd brugklas
                 }
-                'CAS' {
-                    $afdeling = $gv.Klas.split('.')[0]
-                    $wstudy, $leerjaar, $rest = splits $afdeling
-                    Add-ProgramDocent -studie $wstudy -leerjaar $leerjaar -vak $gv.vakcode -docent $d.id
-                }
+                Add-ProgramDocent -studie $wstudy -leerjaar $leerjaar -vak $gv.vakcode -docent $d.id
+            }
+            'CAS' {
+                $afdeling = $gv.Klas.split('.')[0]
+                $wstudy, $leerjaar, $rest = splits $afdeling
+                Add-ProgramDocent -studie $wstudy -leerjaar $leerjaar -vak $gv.vakcode -docent $d.id
             }
         }
     }
     # tel alle klasvakken en docentvakken af, test op lege lijst uitzondering 
     foreach ($kv in $d.klasvakken) {
         foreach ($dv in $d.docentvakken) {
+            $label = "dvak $dv"
+            if ($label -notin $lijst) {
+                $lijst += $label
+            }
+
             switch ($cfg.school) {
                 'JPT' {
                     $leerjaar = $kv.substring(0, 1)
@@ -366,6 +388,11 @@ foreach ($d in $docent) {
     }
 }
 #endregion verzamel
+
+#debug
+$lijst = $lijst | Sort-Object -Unique
+$lijst | Out-File -FilePath "$herepath\$($cfg.tempmap)\labels.txt"
+
 
 # genereer namen. Schooljaarstring "23/24" hoeft niet , wordt automatisch toegevoegd.
 foreach ($p in $programma.Values) {
@@ -416,8 +443,9 @@ if ($skip_onbekendvak) {
     $programma = $programma | Where-Object { $_.naam -notlike "Onbekend*" }
     Write-Host "Programma na exclusief filteren op onbekend vak:" $programma.count 
 }
-#region uitvoer
+#region main-uitvoer
 # uitvoeren
+$programma | Export-Clixml -Path $out_clixml_file 
 
 # maak platte lijst voor CSV export 
 foreach ($p in $programma) {
@@ -429,7 +457,7 @@ $programma.naam | Out-File -FilePath $out_txt_file -Encoding utf8
 
 # Toon programmalijst in interactieve viewer
 if ($usegridview) { 
-    $programma | Export-Clixml -Path $out_clixml_file 
+    $programma | Out-GridView
 }
 
 $stopwatch.Stop()

@@ -129,6 +129,8 @@ De volgende waarden zijn verplicht en mogen niet worden weggelaten: schooldatama
 
 ``onbekendvak_overslaan`` is een schakelaar. 1 betekent dat ReadPhase vakken in de uitvoer overslaat, die niet konden worden gekoppeld aan een bekende vakomschrijving. 
 
+``do_remove_classes`` is een schakelaar, 1 betekent : verwijder niet-gekoppelde klassen uit programma's; 0 betekent laat ze staan.
+
 == Extra's 
 
 == Known issues 
@@ -137,4 +139,6 @@ WootsSync is niet in staat om docenten aan programma's toe te kennen als ze in W
 
 == To Do
 
-* toevoegen docenten die ook beheerder zijn.
+* toevoegen docenten die ook beheerder zijn. Voorlopig moeten deze docenten zichzelf toevoegen.
+* leerjaar toevoegen aan programma's
+* documentatie voor UPN vertaaltabel :-) 
