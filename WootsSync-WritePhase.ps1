@@ -245,7 +245,6 @@ foreach ($u in $wusers) {
 foreach ($prog in $programma) {
     # Stel de programmanaam opnieuw samen
     $teller += 1
-    $studieletter = $prog.studie.substring(0, 1)
     $prognaam = $prog.naam
     #Write-Host "Programma ($($teller)/$($totaal)): $prognaam"
     # maak programma
