@@ -1,6 +1,6 @@
 = WootsSync
 
-Versie 20241101b
+Versie 20260115
 
 == Abstract
 
@@ -19,6 +19,7 @@ Dit script vereist:
 == Installatie
 
 * Download alle bestanden uit de https://github.com/sikkepitje/WootsSync[WootsSync repository] en plaats ze in een map naar keuze. 
+* Installeer de Woots PowerShell module, indien nog niet gedaan, met ``Install-Module -Name Woots`` in een PowerShell-venster (al dan niet met administratorrechten naar behoefte).
 * Maak een API-token aan: log in als beheerder, kies avatar→instellingen→API-token en klik op "Generate new token". Noteer School_id en token.
 * Schrijf de gewenste instellingen in ``WootsSync.ini`` . Maak eventueel de gewenste mappen en zet de vereiste invoerbestanden klaar.
 
@@ -77,7 +78,7 @@ Het script ``WootsSync-WritePhase.ps1`` maakt verbinding met de Woots API, leest
 
 (AANPASSEN) Docentcodes worden aangevuld met '@jpthijsse.nl' om een geldig e-mail te genereren. De betreffende docent wordt met dit e-mail in Woots opgezocht.
 
-=== Filters
+=== Filterbestanden
 
 De volgende filters kunnen worden gedefinieerd om de door ReadPhase aangemaakte lijst programma's te beinvloeden. 
 
@@ -121,15 +122,19 @@ De volgende waarden zijn verplicht en mogen niet worden weggelaten: schooldatama
 
 ``magistersyncleerjaar`` bevat een komma-gescheiden lijst van de leerjaren waarvoor WootsSync programma's aanmaakt. Voor het beste resultaat is het aanbevolen dat WootsSync uitsluitend programma's aanmaakt voor leerjaren die worden gesynchroniseerd met Magister, zoals ingesteld in Woots→Instellingen→Magister. 
 
-``whatif`` is een schakelaar die bepaalt of Write-Phase wijzigingen in Woots aanbrengt ten behoeve van testen en debuggen. 0 betekent: schrijf wijzigingen, 1 betekent: doe alsof, schrijf geen wijzigingen.
+``whatif`` is een schakelaar die bepaalt of Write-Phase wijzigingen in Woots aanbrengt ten behoeve van testen en debuggen. Waarde 0 betekent: schrijf wijzigingen, 1 betekent: doe alsof en schrijf geen wijzigingen.
 
-``do_remove_instructors`` is een schakelaar, 0 betekent: laat staan, 1 betekent: verwijder docenten uit programma's indien ze niet meer voorkomen in de door ReadPhase aangemaakte lijst.
+``do_remove_instructors`` is een schakelaar. Waarde 0 betekent: laat staan. Waarde 1 betekent: verwijder docenten uit programma's indien ze niet meer voorkomen in de door ReadPhase aangemaakte lijst.
 
-``gridview`` is een schakelaar: 1 betekent: ReadPhase toont interactief het resultaat in een GridView-venster. Het programma is dan niet meer geschikt om uit te voeren als geplande taak zonder toezicht (unattended). 
+``gridview`` is een schakelaar. Waarde 1 betekent: ReadPhase toont interactief het resultaat in een GridView-venster. Deze schakelaar is handig voor het beoordelen van het resultaat van ReadPhase, maar kan problemen opleveren als WootsSync wordt uitgevoerd als geplande taak zonder toezicht (unattended), omdat er dan geen gebruiker is om het GridView-venster te sluiten. Waarde 0 betekent dat ReadPhase geen GridView-venster toont.
 
-``onbekendvak_overslaan`` is een schakelaar. 1 betekent dat ReadPhase vakken in de uitvoer overslaat, die niet konden worden gekoppeld aan een bekende vakomschrijving. 
+``onbekendvak_overslaan`` is een schakelaar. Waarde 1 betekent dat ReadPhase vakken in de uitvoer overslaat, die niet konden worden gekoppeld aan een bekende vakomschrijving. 
 
-``do_remove_classes`` is een schakelaar, 1 betekent : verwijder niet-gekoppelde klassen uit programma's; 0 betekent laat ze staan.
+``do_remove_classes`` is een schakelaar. Waarde 1 betekent : verwijder niet-gekoppelde klassen uit programma's. Waarde 0 betekent: laat ze staan.
+
+=== WootsSync-UserTable.txt
+
+In de WootsSync-UserTable.txt kan een vertalingstabel worden gedefinieerd voor gebruikersnamen. De linkerkolom bevat de gebruikersnaam zoals deze wordt vastgesteld op basis van de gegevens in Magister. De rechterkolom bevat de gebruikersnaam zoals deze in Woots voorkomt. De scheiding tussen de kolommen is een is-gelijkteken (=). Deze vertalingstabel wordt gebruikt in WritePhase bij het koppelen van docenten aan programma's.
 
 == Extra's 
 
